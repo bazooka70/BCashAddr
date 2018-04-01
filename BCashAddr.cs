@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NBitcoin.DataEncoders;
@@ -33,7 +33,7 @@ namespace BCashAddr
             public CashFormat Format { get; set; }
             public CashNetwork Network { get; set; }
             public CashType Type { get; set; }
-            public byte[] Hash { get; set; }                        
+            public byte[] Hash { get; set; }
 
             public string GetHash()
             {
@@ -44,6 +44,7 @@ namespace BCashAddr
             public string AsLegacyAddress => EncodeAsLegacy(this);
             public string AsBitpayAddress => EncodeAsBitpay(this);
             public string AsCashaddrAddress => EncodeAsCashaddr(this);
+            public string AsCashaddrAddressNoPrefix => EncodeAsCashaddrNoPrefix(this);
 
             public static BchAddrData Create(CashFormat format, CashNetwork network, CashType type, byte[] hash)
             {
@@ -51,8 +52,8 @@ namespace BCashAddr
                 {
                     Format = format,
                     Network = network,
-                    Type = type,                    
-                    Hash = hash,                    
+                    Type = type,
+                    Hash = hash,
                 };
             }
         }
@@ -64,10 +65,10 @@ namespace BCashAddr
         /// <returns></returns>
         public static string EncodeAsLegacy(BchAddrData decoded)
         {
-            var versionByte = GetVersionByte(CashFormat.Legacy, decoded.Network, decoded.Type);            
-            var buffer = new byte[1] { versionByte };            
+            var versionByte = GetVersionByte(CashFormat.Legacy, decoded.Network, decoded.Type);
+            var buffer = new byte[1] { versionByte };
             buffer = buffer.Concat(decoded.Hash).ToArray();
-            return Encoders.Base58Check.EncodeData(buffer);            
+            return Encoders.Base58Check.EncodeData(buffer);
         }
 
         /// <summary>
@@ -96,6 +97,16 @@ namespace BCashAddr
             return CashAddr.Encode(prefix, type, hash);
         }
 
+        public static string EncodeAsCashaddrNoPrefix(BchAddrData decoded)
+        {
+            var address = EncodeAsCashaddr(decoded);
+            if (address.IndexOf(":") != -1)
+            {
+                return address.Split(':')[1];
+            }
+            throw new Validation.ValidationError($"Invalid BchAddrData");
+        }
+
         public static string GetCashaddrkPrefix(BchAddrData data)
         {
             switch (data.Network)
@@ -121,7 +132,7 @@ namespace BCashAddr
             {
                 return DecodeBase58Address(address);
             }
-            catch { } 
+            catch { }
             try
             {
                 return DecodeCashAddress(address);
@@ -163,7 +174,7 @@ namespace BCashAddr
         /// <param name="address">A valid Bitcoin Cash address in any format</param>
         /// <returns></returns>
         private static BchAddrData DecodeBase58Address(string address)
-        {            
+        {
             var payload = Encoders.Base58Check.DecodeData(address);
             var versionByte = payload[0];
             var hash = payload.Skip(1).ToArray();
@@ -258,11 +269,11 @@ namespace BCashAddr
         {
             Validation.Validate(IsValidPrefix(prefix), $"Invalid prefix: {prefix}");
             var prefixData = Concat(PrefixToUint5Array(prefix), new byte[1]);
-            var versionByte = GetTypeBits(type) + GetHashSizeBits(hash);            
-            var payloadData = ToUint5Array(Concat(new byte[1] { (byte)versionByte }, hash));            
-            var checksumData = Concat(Concat(prefixData, payloadData), new byte[8]);            
+            var versionByte = GetTypeBits(type) + GetHashSizeBits(hash);
+            var payloadData = ToUint5Array(Concat(new byte[1] { (byte)versionByte }, hash));
+            var checksumData = Concat(Concat(prefixData, payloadData), new byte[8]);
             var payload = Concat(payloadData, ChecksumToUint5Array(Polymod(checksumData)));
-            return prefix + ':' + Base32.Encode(payload);            
+            return prefix + ':' + Base32.Encode(payload);
         }
 
         /// <summary>
@@ -276,10 +287,10 @@ namespace BCashAddr
             Validation.Validate(pieces.Length == 2, $"Missing prefix: {address}");
             var prefix = pieces[0];
             var payload = Base32.Decode(pieces[1]);
-            Validation.Validate(ValidChecksum(prefix, payload), $"Invalid checksum: {address}");            
-            var data = payload.Take(payload.Length - 8).ToArray();            
+            Validation.Validate(ValidChecksum(prefix, payload), $"Invalid checksum: {address}");
+            var data = payload.Take(payload.Length - 8).ToArray();
             var payloadData = FromUint5Array(data);
-            var versionByte = payloadData[0];           
+            var versionByte = payloadData[0];
             var hash = payloadData.Skip(1).ToArray();
             Validation.Validate(GetHashSize((byte)versionByte) == hash.Length * 8, $"Invalid hash size: {address}");
             var type = GetType((byte)versionByte);
@@ -288,7 +299,7 @@ namespace BCashAddr
                 Prefix = prefix,
                 Type = type,
                 Hash = hash
-            };            
+            };
         }
 
         /// <summary>
@@ -316,7 +327,7 @@ namespace BCashAddr
         /// <param name="payload"></param>
         /// <returns></returns>
         public static bool ValidChecksum(string prefix, byte[] payload)
-        {            
+        {
             var prefixData = Concat(PrefixToUint5Array(prefix), new byte[1]);
             var checksumData = Concat(prefixData, payload);
             return Polymod(checksumData).Equals(0);
@@ -342,7 +353,7 @@ namespace BCashAddr
             for (var i = 0; i < 8; ++i)
             {
                 result[7 - i] = (byte)(checksum & 31);
-                checksum = checksum >> 5;                
+                checksum = checksum >> 5;
             }
             return result;
         }
@@ -352,23 +363,23 @@ namespace BCashAddr
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static long Polymod(byte [] data)
+        public static long Polymod(byte[] data)
         {
             var GENERATOR = new long[] { 0x98f2bc8e61, 0x79b76d99e2, 0xf33e5fb3c4, 0xae2eabe2a8, 0x1e4f43e470 };
             long checksum = 1;
             for (var i = 0; i < data.Length; ++i)
             {
                 var value = data[i];
-                var topBits = checksum >> 35;                
+                var topBits = checksum >> 35;
                 checksum = ((checksum & 0x07ffffffff) << 5) ^ value;
                 for (var j = 0; j < GENERATOR.Length; ++j)
                 {
-                    if (((topBits >> j) & 1).Equals(1))                    
-                    {                        
+                    if (((topBits >> j) & 1).Equals(1))
+                    {
                         checksum = checksum ^ GENERATOR[j];
                     }
                 }
-            }            
+            }
             return checksum ^ 1;
         }
 
@@ -395,7 +406,7 @@ namespace BCashAddr
             foreach (char c in prefix.ToCharArray())
             {
                 result[i++] = (byte)(c & 31);
-            }            
+            }
             return result;
         }
 
