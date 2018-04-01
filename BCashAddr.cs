@@ -97,6 +97,11 @@ namespace BCashAddr
             return CashAddr.Encode(prefix, type, hash);
         }
 
+        /// <summary>
+        /// Encodes the given decoded address into cashaddr format without a prefix
+        /// </summary>
+        /// <param name="decoded"></param>
+        /// <returns></returns>
         public static string EncodeAsCashaddrNoPrefix(BchAddrData decoded)
         {
             var address = EncodeAsCashaddr(decoded);
@@ -268,11 +273,11 @@ namespace BCashAddr
         public static string Encode(string prefix, string type, byte[] hash)
         {
             Validation.Validate(IsValidPrefix(prefix), $"Invalid prefix: {prefix}");
-            var prefixData = Concat(PrefixToUint5Array(prefix), new byte[1]);
+            var prefixData = Concat(PrefixToByte5Array(prefix), new byte[1]);
             var versionByte = GetTypeBits(type) + GetHashSizeBits(hash);
-            var payloadData = ToUint5Array(Concat(new byte[1] { (byte)versionByte }, hash));
+            var payloadData = ToByte5Array(Concat(new byte[1] { (byte)versionByte }, hash));
             var checksumData = Concat(Concat(prefixData, payloadData), new byte[8]);
-            var payload = Concat(payloadData, ChecksumToUint5Array(Polymod(checksumData)));
+            var payload = Concat(payloadData, ChecksumToByte5Array(Polymod(checksumData)));
             return prefix + ':' + Base32.Encode(payload);
         }
 
@@ -289,7 +294,7 @@ namespace BCashAddr
             var payload = Base32.Decode(pieces[1]);
             Validation.Validate(ValidChecksum(prefix, payload), $"Invalid checksum: {address}");
             var data = payload.Take(payload.Length - 8).ToArray();
-            var payloadData = FromUint5Array(data);
+            var payloadData = FromByte5Array(data);
             var versionByte = payloadData[0];
             var hash = payloadData.Skip(1).ToArray();
             Validation.Validate(GetHashSize((byte)versionByte) == hash.Length * 8, $"Invalid hash size: {address}");
@@ -328,7 +333,7 @@ namespace BCashAddr
         /// <returns></returns>
         public static bool ValidChecksum(string prefix, byte[] payload)
         {
-            var prefixData = Concat(PrefixToUint5Array(prefix), new byte[1]);
+            var prefixData = Concat(PrefixToByte5Array(prefix), new byte[1]);
             var checksumData = Concat(prefixData, payload);
             return Polymod(checksumData).Equals(0);
         }
@@ -347,7 +352,7 @@ namespace BCashAddr
         /// </summary>
         /// <param name="checksum"></param>
         /// <returns></returns>
-        public static byte[] ChecksumToUint5Array(long checksum)
+        public static byte[] ChecksumToByte5Array(long checksum)
         {
             var result = new byte[8];
             for (var i = 0; i < 8; ++i)
@@ -399,7 +404,7 @@ namespace BCashAddr
         /// </summary>
         /// <param name="prefix">Network prefix. E.g.: 'bitcoincash'</param>
         /// <returns></returns>
-        public static byte[] PrefixToUint5Array(string prefix)
+        public static byte[] PrefixToByte5Array(string prefix)
         {
             var result = new byte[prefix.Length];
             int i = 0;
@@ -503,7 +508,7 @@ namespace BCashAddr
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static byte[] ToUint5Array(byte[] data)
+        public static byte[] ToByte5Array(byte[] data)
         {
             return ConvertBits.Convert(data, 8, 5);
         }
@@ -515,7 +520,7 @@ namespace BCashAddr
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static byte[] FromUint5Array(byte[] data)
+        public static byte[] FromByte5Array(byte[] data)
         {
             return ConvertBits.Convert(data, 5, 8, true);
         }
